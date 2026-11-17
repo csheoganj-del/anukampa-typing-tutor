@@ -83,7 +83,7 @@ header p { color: #64748b; }
 .typing-area.is-paused .pause-banner { display: block; }
 .typing-space {
   width: 100%;
-  min-height: 180px;
+  min-height: 460px;
   margin-top: 12px;
   color: #1e293b;
   font-size: 18px;
@@ -174,7 +174,7 @@ footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85re
 
   <div id="home">
     <div class="intro">
-      Choose a lesson and type the passage on screen. The clock starts on your first key.
+      Choose a lesson and type from your printed paper. The clock starts on your first key.
       <strong>Esc</strong> pauses and resumes. Paused time is not counted.
       A result of <strong>28 net WPM or more</strong> qualifies. Mistakes are checked again on the result.
     </div>
@@ -184,9 +184,8 @@ footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85re
   <div class="typing-area" id="typingArea">
     <div class="lesson-head">
       <h2 id="lessonTitle">Lesson</h2>
-      <button type="button" class="btn-secondary" id="hideBtn">Hide passage</button>
     </div>
-    <p class="note" id="typingNote">Type the blue character next. Green matches the passage. Red is a mistake. Backspace can correct before you finish. Paste is off.</p>
+    <p class="note" id="typingNote">Keep the printed paper in front of you and type here. The clock starts on your first key. Esc pauses and resumes. Backspace can correct before you finish. Paste is off.</p>
     <div class="stats-bar">
       <div class="stat"><div class="label" id="timerLabel">Time left</div><div class="value" id="timer">10:00</div></div>
       <div class="stat"><div class="label">Gross WPM</div><div class="value" id="liveWpm">0</div></div>
@@ -195,14 +194,8 @@ footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85re
       <div class="stat"><div class="label">Mistakes</div><div class="value" id="liveErrors">0</div></div>
       <div class="stat"><div class="label">Progress</div><div class="value" id="liveProgress">0%</div></div>
     </div>
-    <div class="legend">
-      <span><i class="swatch ok"></i>Correct</span>
-      <span><i class="swatch bad"></i>Mistake</span>
-      <span><i class="swatch cur"></i>Next character</span>
-    </div>
-    <div class="passage" id="passage"></div>
     <div class="pause-banner" id="pauseBanner">Paused. The clock is stopped and typing is locked. Press Resume or Esc.</div>
-    <textarea class="typing-space" id="inputArea" placeholder="Start typing the passage..." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+    <textarea class="typing-space" id="inputArea" placeholder="Start typing from your printed paper..." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
     <div class="status-line" id="typingStatus"></div>
     <div class="controls">
       <button type="button" class="btn-primary" id="finishBtn">Finish test</button>
@@ -275,13 +268,11 @@ let runningSince = null;
 let pauseStartedAt = null;
 let pausedAccum = 0;
 let timerInterval = null;
-let passageHidden = false;
 let lastTyped = "";
 let lastPassage = "";
 let lastMistakes = [];
 
 const input = document.getElementById("inputArea");
-const passageBox = document.getElementById("passage");
 
 function wordCount(text) {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -416,28 +407,6 @@ function syncPauseButton() {
   btn.textContent = paused ? "Resume" : "Pause";
 }
 
-function renderPassage(typed) {
-  const text = lessons[currentIndex].text;
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < text.length; i++) {
-    const span = document.createElement("span");
-    span.textContent = text[i];
-    if (i < typed.length) span.className = typed[i] === text[i] ? "ok" : "bad";
-    else if (i === typed.length) span.className = "cur";
-    frag.appendChild(span);
-  }
-  passageBox.textContent = "";
-  passageBox.appendChild(frag);
-  const cur = passageBox.querySelector(".cur");
-  if (!cur) return;
-  const top = cur.offsetTop;
-  const bottom = top + cur.offsetHeight;
-  if (top < passageBox.scrollTop) passageBox.scrollTop = Math.max(0, top - 12);
-  else if (bottom > passageBox.scrollTop + passageBox.clientHeight) {
-    passageBox.scrollTop = bottom - passageBox.clientHeight + 12;
-  }
-}
-
 function renderTypedReview(typed, passage) {
   const box = document.getElementById("typedReview");
   box.textContent = "";
@@ -515,7 +484,6 @@ function updateLiveStats(typed) {
     netEl.textContent = String(score.netWpm);
     netEl.style.color = score.qualified ? "#16a34a" : "#1d4ed8";
   }
-  renderPassage(typed);
 }
 
 function updateTimer() {
@@ -575,9 +543,6 @@ function startLesson(index) {
   document.getElementById("lessonTitle").textContent = lessons[index].title;
   input.value = "";
   input.disabled = false;
-  passageHidden = false;
-  passageBox.style.display = "";
-  document.getElementById("hideBtn").textContent = "Hide passage";
   document.getElementById("liveWpm").textContent = "0";
   document.getElementById("liveNet").textContent = "0";
   document.getElementById("liveNet").style.color = "#1d4ed8";
@@ -586,7 +551,6 @@ function startLesson(index) {
   document.getElementById("liveProgress").textContent = "0%";
   setStatus("");
   renderClock();
-  renderPassage("");
   syncPauseButton();
   input.focus();
 }
@@ -595,7 +559,7 @@ function finishTest(fromTimer) {
   if (finished) return;
   const typed = input.value;
   if (!typed.length && !fromTimer) {
-    setStatus("Type the passage before finishing.");
+    setStatus("Type from your paper before finishing.");
     return;
   }
   if (runningSince) {
@@ -729,11 +693,6 @@ document.getElementById("homeBtn").onclick = function () {
   document.getElementById("home").style.display = "block";
   initRefreshBest();
 };
-document.getElementById("hideBtn").onclick = function () {
-  passageHidden = !passageHidden;
-  passageBox.style.display = passageHidden ? "none" : "";
-  document.getElementById("hideBtn").textContent = passageHidden ? "Show passage" : "Hide passage";
-};
 document.getElementById("recheckBtn").onclick = function () {
   const ok = paintCheck(lastTyped, lastPassage, lastMistakes);
   if (ok) {
@@ -744,8 +703,6 @@ document.getElementById("recheckBtn").onclick = function () {
     document.getElementById("checkNote").classList.add("pass");
   }
 };
-passageBox.addEventListener("click", function () { if (!input.disabled) input.focus(); });
-
 document.addEventListener("keydown", function (event) {
   if (event.key !== "Escape") return;
   if (!document.getElementById("typingArea").classList.contains("active")) return;
