@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LDC Rajasthan Typing Tutor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+  min-height: 100vh;
+  padding: 20px;
+}
+.container { max-width: 980px; margin: 0 auto; }
+header, .panel, .lesson-card, .stats-bar, .passage, .typing-space, .results, .intro {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+header { text-align: center; margin-bottom: 18px; padding: 20px; }
+header h1 { font-size: 1.8rem; color: #1d4ed8; margin-bottom: 4px; }
+header p { color: #64748b; }
+.intro { padding: 14px 16px; margin-bottom: 16px; color: #334155; line-height: 1.55; }
+.intro strong { color: #1d4ed8; }
+.lessons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.lesson-card { padding: 14px; cursor: pointer; }
+.lesson-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+.lesson-card h3 { color: #1d4ed8; margin-bottom: 4px; font-size: 1rem; }
+.lesson-card .wc { color: #64748b; font-size: 0.85rem; }
+.lesson-card .best { margin-top: 6px; font-size: 0.82rem; color: #15803d; font-weight: 700; }
+.typing-area { display: none; }
+.typing-area.active { display: block; }
+.lesson-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
+.lesson-head h2 { font-size: 1.15rem; color: #1d4ed8; }
+.note { color: #475569; margin-bottom: 12px; line-height: 1.5; }
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.stat { text-align: center; }
+.stat .label { font-size: 0.75rem; color: #64748b; }
+.stat .value { font-size: 1.35rem; font-weight: 700; color: #1d4ed8; }
+.stat .value.paused-time { color: #b45309; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: #475569; margin: 8px 0; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.swatch.ok { background: #86efac; }
+.swatch.bad { background: #fca5a5; }
+.swatch.cur { background: #93c5fd; }
+.passage {
+  min-height: 180px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 16px 18px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 18px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  position: relative;
+}
+.passage span.ok { background: #dcfce7; color: #166534; }
+.passage span.bad { background: #fecaca; color: #991b1b; }
+.passage span.cur { background: #bfdbfe; }
+.pause-banner {
+  display: none;
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-weight: 600;
+}
+.typing-area.is-paused .pause-banner { display: block; }
+.typing-space {
+  width: 100%;
+  min-height: 180px;
+  margin-top: 12px;
+  color: #1e293b;
+  font-size: 18px;
+  padding: 16px 18px;
+  font-family: Consolas, "Courier New", monospace;
+  line-height: 1.7;
+  resize: vertical;
+}
+.typing-space:focus { outline: none; border-color: #3b82f6; }
+.typing-space:disabled { background: #f8fafc; color: #64748b; }
+.status-line { min-height: 1.2em; margin-top: 8px; color: #b45309; font-size: 0.9rem; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+button { padding: 11px 18px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.95rem; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-secondary { background: #e2e8f0; color: #334155; }
+.btn-warn { background: #f59e0b; color: #1f2937; }
+.results { display: none; padding: 26px; text-align: center; }
+.results.active { display: block; }
+.results h2 { color: #1d4ed8; margin-bottom: 8px; }
+.formula, .check-note, .left-note {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  color: #475569;
+  margin: 12px 0;
+  text-align: left;
+  line-height: 1.5;
+}
+.check-note.pass { background: #f0fdf4; color: #166534; }
+.check-note.fail { background: #fef2f2; color: #991b1b; }
+.result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 16px 0; }
+.result-item { background: #f8fafc; padding: 14px; border-radius: 12px; border: 1px solid #e2e8f0; }
+.result-item .big { font-size: 1.8rem; font-weight: 700; color: #1d4ed8; }
+.result-item.pass .big { color: #16a34a; }
+.result-item.fail .big { color: #dc2626; }
+.result-item .label { color: #64748b; font-size: 0.82rem; margin-top: 4px; }
+#resultMessage { margin: 8px 0 4px; font-size: 1.08rem; font-weight: 700; }
+.review-title { text-align: left; margin: 18px 0 8px; color: #1e293b; }
+.typed-review {
+  text-align: left;
+  max-height: 200px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  white-space: pre-wrap;
+  line-height: 1.7;
+  background: #fff;
+}
+.typed-review span.ok { background: #dcfce7; }
+.typed-review span.bad { background: #fecaca; }
+.mistake-wrap { max-height: 340px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+th { background: #f8fafc; position: sticky; top: 0; }
+td.mono, th.mono { font-family: Consolas, "Courier New", monospace; }
+.selftest {
+  display: block;
+  margin-bottom: 14px;
+  padding: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+}
+.selftest[hidden] { display: none; }
+footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85rem; }
+@media (max-width: 800px) {
+  .stats-bar { grid-template-columns: repeat(3, 1fr); }
+  header h1 { font-size: 1.35rem; }
+  .passage, .typing-space { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>LDC Rajasthan Typing Tutor</h1>
+    <p>Anukampa Niyukti departmental exam · English · 10 minutes · Qualify at 28 Net WPM</p>
+  </header>
+
+  <pre id="selftestLog" class="selftest" hidden></pre>
+
+  <div id="home">
+    <div class="intro">
+      Choose a lesson and type the passage on screen. The clock starts on your first key.
+      <strong>Esc</strong> pauses and resumes. Paused time is not counted.
+      A result of <strong>28 net WPM or more</strong> qualifies. Mistakes are checked again on the result.
+    </div>
+    <div class="lessons-grid" id="lessonsGrid"></div>
+  </div>
+
+  <div class="typing-area" id="typingArea">
+    <div class="lesson-head">
+      <h2 id="lessonTitle">Lesson</h2>
+      <button type="button" class="btn-secondary" id="hideBtn">Hide passage</button>
+    </div>
+    <p class="note" id="typingNote">Type the blue character next. Green matches the passage. Red is a mistake. Backspace can correct before you finish. Paste is off.</p>
+    <div class="stats-bar">
+      <div class="stat"><div class="label" id="timerLabel">Time left</div><div class="value" id="timer">10:00</div></div>
+      <div class="stat"><div class="label">Gross WPM</div><div class="value" id="liveWpm">0</div></div>
+      <div class="stat"><div class="label">Net WPM</div><div class="value" id="liveNet">0</div></div>
+      <div class="stat"><div class="label">Accuracy</div><div class="value" id="liveAcc">100%</div></div>
+      <div class="stat"><div class="label">Mistakes</div><div class="value" id="liveErrors">0</div></div>
+      <div class="stat"><div class="label">Progress</div><div class="value" id="liveProgress">0%</div></div>
+    </div>
+    <div class="legend">
+      <span><i class="swatch ok"></i>Correct</span>
+      <span><i class="swatch bad"></i>Mistake</span>
+      <span><i class="swatch cur"></i>Next character</span>
+    </div>
+    <div class="passage" id="passage"></div>
+    <div class="pause-banner" id="pauseBanner">Paused. The clock is stopped and typing is locked. Press Resume or Esc.</div>
+    <textarea class="typing-space" id="inputArea" placeholder="Start typing the passage..." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+    <div class="status-line" id="typingStatus"></div>
+    <div class="controls">
+      <button type="button" class="btn-primary" id="finishBtn">Finish test</button>
+      <button type="button" class="btn-warn" id="pauseBtn" disabled>Pause</button>
+      <button type="button" class="btn-secondary" id="restartBtn">Restart</button>
+      <button type="button" class="btn-secondary" id="backBtn">Back to lessons</button>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <h2 id="resultHeading">Test result</h2>
+    <div id="resultMessage"></div>
+    <div class="formula">
+      <b>Gross WPM</b> = (characters typed ÷ 5) ÷ active minutes<br>
+      <b>Net WPM</b> = Gross WPM − (mistakes ÷ 5 ÷ active minutes)<br>
+      <b>Accuracy</b> = (correct characters ÷ characters typed) × 100<br>
+      5 characters = 1 word. 5 mistakes reduce the speed by 1 word.
+      Characters you have not reached are not mistakes. Pause time is not counted.
+      Qualifying speed for this Anukampa Niyukti test: <b>28 net WPM</b>.
+    </div>
+    <div class="result-grid">
+      <div class="result-item" id="netItem"><div class="big" id="resNet">0</div><div class="label">Net WPM</div></div>
+      <div class="result-item"><div class="big" id="resGross">0</div><div class="label">Gross WPM</div></div>
+      <div class="result-item"><div class="big" id="resAcc">0%</div><div class="label">Accuracy</div></div>
+      <div class="result-item" id="errItem"><div class="big" id="resErrors">0</div><div class="label">Mistakes</div></div>
+      <div class="result-item"><div class="big" id="resTime">0:00</div><div class="label">Active time</div></div>
+      <div class="result-item"><div class="big" id="resChars">0</div><div class="label">Characters</div></div>
+    </div>
+    <div class="left-note" id="leftNote"></div>
+    <h3 class="review-title">What you typed</h3>
+    <div class="typed-review" id="typedReview"></div>
+    <h3 class="review-title">Typed mistakes</h3>
+    <div class="check-note" id="checkNote"></div>
+    <div class="mistake-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Character</th>
+            <th>Expected</th>
+            <th>You typed</th>
+            <th>Passage</th>
+            <th>Your text</th>
+          </tr>
+        </thead>
+        <tbody id="mistakeBody"></tbody>
+      </table>
+    </div>
+    <div class="controls" style="justify-content: center;">
+      <button type="button" class="btn-secondary" id="recheckBtn">Check mistakes again</button>
+      <button type="button" class="btn-primary" id="retryBtn">Retry lesson</button>
+      <button type="button" class="btn-secondary" id="homeBtn">Choose another lesson</button>
+    </div>
+  </div>
+  <footer>Anukampa Niyukti departmental exam · Qualifying speed: 28 Net WPM</footer>
+</div>
+
+<script>
+const QUALIFY_WPM = 28;
+const TOTAL_SECONDS = 600;
+const STORE_KEY = "anukampa-typing-best-v1";
+const lessons = [{"title":"1. Education and Literacy","text":"The importance of education in modern society cannot be overstated. Education empowers individuals to achieve their full potential and contributes to the overall progress of a nation. In Rajasthan efforts are being made to improve literacy rates and provide quality education to all children especially in rural areas. Schools are being equipped with better facilities trained teachers and digital tools to make learning more effective. Parents and communities play a vital role in supporting the education of children by ensuring regular attendance. The government has launched various schemes to provide scholarships free textbooks and mid-day meals. Higher education institutions are expanding to offer courses in emerging fields like information technology and healthcare. Vocational training programs help young people acquire practical skills that lead to employment. Lifelong learning is becoming essential as technology continues to change the way we work and live. Digital literacy is now considered a basic skill alongside reading and writing. Online learning platforms have made education accessible to people in remote locations. Teachers need continuous professional development to stay updated with new methods. Collaboration between schools parents and local authorities is key to improving outcomes. Investment in education yields long-term benefits for the economy and society. Educated citizens are better equipped to participate in democratic processes. Challenges such as high dropout rates and teacher shortages still need to be addressed. Public-private partnerships can help bridge some of these gaps. Community awareness campaigns promote the value of education for both boys and girls. Inclusive education ensures that children with special needs receive appropriate support. The future of Rajasthan depends on the quality of education provided to its young population. Every child deserves the opportunity to learn and grow in a safe environment. Continuous efforts are required to achieve universal quality education."},{"title":"2. Environment and Conservation","text":"Protecting the environment is one of the most important responsibilities of our generation. Clean air pure water and fertile soil are essential for the survival of all living beings. In recent years pollution has increased due to industrial growth vehicle emissions and improper waste disposal. Deforestation and climate change are causing serious problems such as rising temperatures irregular rainfall and loss of biodiversity. Every individual can contribute by reducing the use of plastic saving electricity and planting trees regularly. Government initiatives like the Clean India Mission and renewable energy projects are helping to create a greener and healthier future for everyone. Forests act as the lungs of the earth by absorbing carbon dioxide and releasing oxygen. Wildlife conservation is necessary to maintain the balance of nature. Rivers and lakes must be kept free from industrial waste and plastic pollution. Farmers are being encouraged to adopt organic farming methods to protect soil health and reduce chemical use. Solar and wind energy are being promoted as clean alternatives to fossil fuels. Public awareness campaigns educate people about the harmful effects of pollution on health and the climate. Schools and colleges are organizing tree plantation drives and cleanliness campaigns across the country. Small changes in daily habits can make a big difference over time. Using public transport recycling waste and avoiding single-use plastics help reduce environmental pressure. Community participation is vital for the success of any conservation effort. The future of our planet depends on the actions we take today. Sustainable development ensures that we meet our present needs without compromising the ability of future generations to meet theirs. Continuous efforts are required to protect natural resources and create a healthier environment for all living beings on earth."},{"title":"3. Health and Hygiene","text":"Good health is the foundation of a happy and productive life. A balanced diet regular exercise and adequate sleep are essential for maintaining physical and mental well-being. In modern times lifestyle diseases such as diabetes obesity and high blood pressure have become common due to lack of physical activity and unhealthy food habits. Preventive healthcare is better than curative treatment. Regular health check-ups help in the early detection of diseases and allow timely treatment. Vaccination programs protect children and adults from many serious infections and improve overall public health across the country. Mental health is equally important as physical health. Stress anxiety and depression affect millions of people in daily life. Talking to friends family or professional counselors can provide much needed relief and support. Yoga and meditation help in managing stress and improving concentration and emotional balance. Clean surroundings and personal hygiene prevent the spread of many diseases. Handwashing safe drinking water and proper sanitation are basic requirements for maintaining good health. The government runs various health schemes to provide affordable medical care to the people especially in rural and remote areas of the state. Doctors nurses and health workers play a crucial role in the healthcare system of the country. Awareness about nutrition exercise and hygiene should begin at home and continue in schools. Avoiding tobacco alcohol and junk food significantly reduces health risks. Regular physical activity keeps the body fit and the mind active and positive. A healthy population contributes greatly to the economic and social progress of the nation. Continuous efforts are needed to strengthen healthcare infrastructure and promote healthy living among all sections of society."},{"title":"4. Digital India and Technology","text":"Digital technology has transformed the way we live work and communicate in the modern world. The Digital India initiative aims to provide high-speed internet connectivity and digital services to every citizen across the country. Online platforms have made banking education and government services more accessible and convenient. Mobile phones and computers have become essential tools in daily life for people of all ages. Digital literacy helps people use technology safely and effectively. E-governance has reduced paperwork and made administrative processes faster and more transparent for the public. Farmers use mobile apps to check weather updates market prices and modern farming techniques. Online shopping and digital payments have made transactions convenient and secure for millions of users. Cybersecurity awareness is important to protect personal data and prevent online fraud and scams. Skill development programs train youth in coding data analysis and digital marketing. Technology has also improved healthcare through telemedicine and online consultations with doctors. Teachers use digital tools to make classrooms more interactive and engaging for students of all ages. While technology brings many benefits it also creates challenges such as the digital divide and data privacy concerns. Efforts are being made to provide internet access in rural areas and train people in digital skills. Responsible use of technology ensures that its benefits reach every section of society. Continuous innovation and investment in digital infrastructure will drive economic growth and improve the quality of life for millions of people across the country. Digital literacy is now as important as traditional education for success in the modern world."},{"title":"5. Agriculture and Farmers","text":"Agriculture is the backbone of the Indian economy and provides livelihood to a large section of the population. Farmers work hard throughout the year to grow food grains vegetables and fruits that feed the nation. Modern techniques such as drip irrigation organic farming and the use of improved seeds have increased productivity. The government provides subsidies fertilizers and crop insurance to support farmers during difficult times. Timely information about weather and market prices helps farmers make better decisions. Agricultural universities and research centers develop new varieties of crops suitable for different climates. In Rajasthan water scarcity is a major challenge for farmers. Rainwater harvesting and efficient irrigation methods help in conserving water. Dairy farming and animal husbandry provide additional income to many rural families. Farmer producer organizations help small farmers get better prices for their produce. Training programs teach farmers about soil health management and pest control without excessive use of chemicals. Digital platforms connect farmers directly with buyers and reduce the role of middlemen. Sustainable agriculture protects the environment while ensuring food security for the growing population. Young people are being encouraged to take up farming with the help of new technology and financial support. A strong agricultural sector contributes to rural development and national prosperity. Continuous efforts are needed to improve the income and living standards of farmers across the country. Better storage facilities and market access can further increase the benefits for farmers."},{"title":"6. Women Empowerment","text":"Women empowerment is essential for the progress of any society. When women are educated and economically independent they contribute significantly to the family and the nation. The government has launched various schemes to promote education skill development and financial inclusion for women. Self-help groups have helped millions of women start small businesses and become self-reliant. Equal opportunities in education and employment are necessary for true empowerment. Legal provisions protect women from discrimination and violence and ensure their rights in all spheres of life. In rural areas women play an important role in agriculture animal husbandry and household management. Awareness programs educate women about their legal rights health and nutrition. Reservation in local bodies has given women a voice in decision-making processes. Vocational training in areas such as tailoring beauty culture and computer skills creates employment opportunities. Support from family and society is crucial for women to achieve their goals and aspirations in life. Educated and empowered women raise healthier and better educated children. Their participation in the workforce boosts economic growth and social development. Challenges such as gender bias and safety concerns still need to be addressed. Continuous efforts by the government communities and individuals are required to create an environment where every woman can live with dignity and equality. Empowerment of women leads to the overall progress of the nation."},{"title":"7. Importance of Reading","text":"Reading is one of the most valuable habits a person can develop. It expands knowledge improves vocabulary and enhances critical thinking skills. Regular reading helps people understand different cultures ideas and perspectives. Books newspapers and online articles provide information on a wide range of subjects. Reading for pleasure reduces stress and improves concentration. Students who read regularly perform better in their studies and develop strong communication skills. Libraries and reading rooms encourage the habit of reading among children and adults. Digital platforms have made books and articles easily accessible to everyone. Parents and teachers play an important role in promoting reading among young learners. Reading improves imagination and creativity which are essential for problem solving. In the age of short videos and social media the habit of deep reading is becoming more important than ever for personal growth. A society that values reading produces informed and thoughtful citizens. Continuous reading keeps the mind active and helps people adapt to new knowledge. Schools should organize reading competitions and book fairs to motivate students. The habit of reading once developed continues to benefit a person throughout life. Encouraging reading at home and in schools can create a more knowledgeable and progressive society. Daily reading for even thirty minutes can make a significant difference in a person's life."},{"title":"8. Water Conservation","text":"Water is a precious natural resource that is essential for life. With growing population and climate change water scarcity has become a serious problem in many parts of the country. Conserving water is the responsibility of every citizen. Simple steps such as fixing leaking taps using buckets instead of showers and harvesting rainwater can save large amounts of water. Farmers can adopt drip irrigation and other efficient methods to reduce water use in agriculture. Rivers lakes and groundwater sources must be protected from pollution. Industrial waste and sewage should be treated before being released into water bodies. Rainwater harvesting systems in homes and public buildings help recharge groundwater. Awareness campaigns educate people about the importance of saving water. Schools teach children about water conservation so that they develop responsible habits from a young age. Efficient use of water ensures that future generations will also have access to this vital resource. Government programs support the construction of check dams and ponds in rural areas. Community participation is necessary for the success of water conservation efforts. Every drop saved today contributes to water security tomorrow. Continuous efforts are required to protect and manage our water resources wisely for the benefit of all."},{"title":"9. Road Safety","text":"Road safety is essential for protecting lives and reducing accidents. Every year thousands of people lose their lives due to careless driving overspeeding and violation of traffic rules. Following traffic signals wearing helmets and seat belts and avoiding the use of mobile phones while driving can prevent many accidents. Pedestrians should use footpaths and zebra crossings. Drivers must maintain a safe distance from other vehicles and never drive under the influence of alcohol. Proper road infrastructure including clear signage speed breakers and street lighting improves safety. Regular vehicle maintenance ensures that brakes lights and tires are in good condition. Awareness campaigns educate people about traffic rules and safe driving practices. Schools teach children about road safety so that they become responsible road users. Strict enforcement of traffic laws reduces violations and saves lives. Safe roads benefit everyone by reducing injuries medical costs and loss of productivity. Drivers and pedestrians both share the responsibility of making roads safer. Continuous efforts by the government and citizens are needed to improve road safety across the country. Following simple rules can prevent most accidents and make travel safer for all. Responsible driving and awareness can save countless lives every year."},{"title":"10. Youth and Employment","text":"Youth form the largest section of the population and are the future of the nation. Providing them with quality education and skill training is essential for their employment and personal growth. Vocational courses and internship programs help young people gain practical experience. The government runs several schemes to support entrepreneurship and self-employment among youth. Digital skills and technical knowledge are in high demand in the modern job market. Unemployment among educated youth remains a challenge in many areas. Career counseling helps students choose suitable fields based on their interests and abilities. Industries and educational institutions should work together to design courses that match job requirements. Soft skills such as communication teamwork and problem solving are equally important for success. Start-up culture encourages young people to create their own opportunities. A skilled and employed youth population drives economic growth and social progress. Continuous investment in education and skill development is necessary to meet the demands of a changing economy. Supporting young entrepreneurs creates more jobs and innovation. With proper guidance and opportunities the youth of the country can achieve great success and contribute to national development. Skill development and employment generation remain key priorities for the nation."}];
+
+let currentIndex = -1;
+let finished = false;
+let paused = false;
+let testActive = false;
+let elapsedBefore = 0;
+let runningSince = null;
+let pauseStartedAt = null;
+let pausedAccum = 0;
+let timerInterval = null;
+let passageHidden = false;
+let lastTyped = "";
+let lastPassage = "";
+let lastMistakes = [];
+
+const input = document.getElementById("inputArea");
+const passageBox = document.getElementById("passage");
+
+function wordCount(text) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function loadBest() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+  catch (e) { return {}; }
+}
+
+function saveBest(index, record) {
+  const all = loadBest();
+  all[String(index)] = record;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(all)); }
+  catch (e) { /* storage can be blocked; the result is still shown */ }
+}
+
+function activeMs() {
+  if (!runningSince) return elapsedBefore;
+  return elapsedBefore + (Date.now() - runningSince);
+}
+
+function currentPausedMs() {
+  let ms = pausedAccum;
+  if (paused && pauseStartedAt) ms += Date.now() - pauseStartedAt;
+  return ms;
+}
+
+function showChar(ch, isExtra) {
+  if (isExtra) return "nothing (extra key)";
+  if (ch === " ") return "space";
+  if (ch === "\n") return "Enter";
+  return '"' + ch + '"';
+}
+
+function wordAt(text, index) {
+  if (index < 0 || index >= text.length) return "";
+  if (text[index] === " ") return "(space)";
+  let start = index;
+  while (start > 0 && text[start - 1] !== " ") start--;
+  let end = index;
+  while (end < text.length && text[end] !== " ") end++;
+  return text.slice(start, end);
+}
+
+function snippet(text, index) {
+  if (index >= text.length) return "(end of text)";
+  const start = Math.max(0, index - 16);
+  const end = Math.min(text.length, index + 17);
+  const before = text.slice(start, index);
+  const ch = text[index] === " " ? "␣" : text[index];
+  const after = text.slice(index + 1, end);
+  return (start > 0 ? "…" : "") + before + "[" + ch + "]" + after + (end < text.length ? "…" : "");
+}
+
+function analyze(typed, passage) {
+  const mistakes = [];
+  for (let i = 0; i < typed.length; i++) {
+    const extra = i >= passage.length;
+    const expected = extra ? null : passage[i];
+    if (extra || typed[i] !== expected) {
+      mistakes.push({ index: i, expected: expected, typed: typed[i] });
+    }
+  }
+  return {
+    totalChars: typed.length,
+    correct: typed.length - mistakes.length,
+    errors: mistakes.length,
+    mistakes: mistakes
+  };
+}
+
+function scoreFrom(stats, ms) {
+  const minutes = Math.max(ms, 1) / 60000;
+  const grossWpm = Math.round((stats.totalChars / 5) / minutes);
+  const errorPenalty = Math.round((stats.errors / 5) / minutes);
+  const netWpm = Math.max(0, grossWpm - errorPenalty);
+  const accuracy = stats.totalChars > 0 ? Math.round((stats.correct / stats.totalChars) * 100) : 0;
+  return {
+    grossWpm: grossWpm,
+    errorPenalty: errorPenalty,
+    netWpm: netWpm,
+    accuracy: accuracy,
+    qualified: netWpm >= QUALIFY_WPM
+  };
+}
+
+function verifyMistakes(typed, passage, mistakes) {
+  const again = analyze(typed, passage);
+  if (again.errors !== mistakes.length) return false;
+  for (let i = 0; i < mistakes.length; i++) {
+    const a = again.mistakes[i];
+    const b = mistakes[i];
+    if (a.index !== b.index || a.typed !== b.typed || a.expected !== b.expected) return false;
+  }
+  const rows = document.querySelectorAll("#mistakeBody tr");
+  if (rows.length !== mistakes.length) return false;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const item = mistakes[i];
+    if (Number(row.dataset.index) !== item.index) return false;
+    if (row.dataset.typed !== item.typed) return false;
+    const exp = item.expected === null ? "" : item.expected;
+    if (row.dataset.exp !== exp) return false;
+  }
+  return true;
+}
+
+function setStatus(text) {
+  document.getElementById("typingStatus").textContent = text || "";
+}
+
+function formatClock(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return m + ":" + String(s).padStart(2, "0");
+}
+
+function renderClock() {
+  const elapsed = Math.floor(activeMs() / 1000);
+  const remaining = Math.max(0, TOTAL_SECONDS - elapsed);
+  const timer = document.getElementById("timer");
+  timer.textContent = formatClock(remaining);
+  timer.classList.toggle("paused-time", paused);
+  document.getElementById("timerLabel").textContent = paused ? "Paused" : "Time left";
+  return remaining;
+}
+
+function syncPauseButton() {
+  const btn = document.getElementById("pauseBtn");
+  btn.disabled = !testActive || finished;
+  btn.textContent = paused ? "Resume" : "Pause";
+}
+
+function renderPassage(typed) {
+  const text = lessons[currentIndex].text;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < text.length; i++) {
+    const span = document.createElement("span");
+    span.textContent = text[i];
+    if (i < typed.length) span.className = typed[i] === text[i] ? "ok" : "bad";
+    else if (i === typed.length) span.className = "cur";
+    frag.appendChild(span);
+  }
+  passageBox.textContent = "";
+  passageBox.appendChild(frag);
+  const cur = passageBox.querySelector(".cur");
+  if (!cur) return;
+  const top = cur.offsetTop;
+  const bottom = top + cur.offsetHeight;
+  if (top < passageBox.scrollTop) passageBox.scrollTop = Math.max(0, top - 12);
+  else if (bottom > passageBox.scrollTop + passageBox.clientHeight) {
+    passageBox.scrollTop = bottom - passageBox.clientHeight + 12;
+  }
+}
+
+function renderTypedReview(typed, passage) {
+  const box = document.getElementById("typedReview");
+  box.textContent = "";
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < typed.length; i++) {
+    const span = document.createElement("span");
+    span.textContent = typed[i];
+    const expected = i < passage.length ? passage[i] : null;
+    span.className = expected === typed[i] ? "ok" : "bad";
+    frag.appendChild(span);
+  }
+  box.appendChild(frag);
+}
+
+function fillMistakeTable(typed, passage, mistakes) {
+  const body = document.getElementById("mistakeBody");
+  body.textContent = "";
+  mistakes.forEach(function (item, n) {
+    const tr = document.createElement("tr");
+    tr.dataset.index = String(item.index);
+    tr.dataset.exp = item.expected === null ? "" : item.expected;
+    tr.dataset.typed = item.typed;
+    const cells = [
+      String(n + 1),
+      String(item.index + 1),
+      showChar(item.expected, item.expected === null),
+      showChar(item.typed, false),
+      item.expected === null ? "(past the end)" : snippet(passage, item.index),
+      snippet(typed, item.index)
+    ];
+    cells.forEach(function (value) {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+    const expectedWord = item.expected === null ? "" : wordAt(passage, item.index);
+    const typedWord = wordAt(typed, item.index);
+    tr.dataset.expectedWord = expectedWord;
+    tr.dataset.typedWord = typedWord;
+    body.appendChild(tr);
+  });
+}
+
+function paintCheck(typed, passage, mistakes) {
+  const note = document.getElementById("checkNote");
+  const ok = verifyMistakes(typed, passage, mistakes);
+  note.classList.remove("pass", "fail");
+  if (ok && mistakes.length === 0) {
+    note.classList.add("pass");
+    note.textContent = "Checked: no mismatches. Every typed character matches the passage. Counted again from the final text: 0 mistakes.";
+  } else if (ok) {
+    note.classList.add("pass");
+    note.textContent = "Checked: all " + mistakes.length + " mistakes match the passage, character by character. Counted again from the final text: " + mistakes.length + ".";
+  } else {
+    note.classList.add("fail");
+    note.textContent = "Check failed. The mistake list does not match a fresh count of the final text. Retry the lesson.";
+  }
+  return ok;
+}
+
+function updateLiveStats(typed) {
+  const passage = lessons[currentIndex].text;
+  const stats = analyze(typed, passage);
+  const ms = activeMs();
+  document.getElementById("liveErrors").textContent = String(stats.errors);
+  document.getElementById("liveAcc").textContent = (typed.length ? Math.round((stats.correct / typed.length) * 100) : 100) + "%";
+  document.getElementById("liveProgress").textContent = Math.min(100, Math.round((typed.length / passage.length) * 100)) + "%";
+  if (ms < 500) {
+    document.getElementById("liveWpm").textContent = "0";
+    document.getElementById("liveNet").textContent = "0";
+  } else {
+    const score = scoreFrom(stats, ms);
+    document.getElementById("liveWpm").textContent = String(score.grossWpm);
+    const netEl = document.getElementById("liveNet");
+    netEl.textContent = String(score.netWpm);
+    netEl.style.color = score.qualified ? "#16a34a" : "#1d4ed8";
+  }
+  renderPassage(typed);
+}
+
+function updateTimer() {
+  const remaining = renderClock();
+  if (testActive && !paused) updateLiveStats(input.value);
+  if (remaining <= 0 && testActive && !paused) finishTest(true);
+}
+
+function pauseTest() {
+  if (!testActive || finished || paused || !runningSince) return;
+  elapsedBefore += Date.now() - runningSince;
+  runningSince = null;
+  paused = true;
+  pauseStartedAt = Date.now();
+  clearInterval(timerInterval);
+  input.disabled = true;
+  document.getElementById("typingArea").classList.add("is-paused");
+  syncPauseButton();
+  renderClock();
+  setStatus("Paused. Resume to continue the same attempt.");
+}
+
+function resumeTest() {
+  if (!testActive || finished || !paused) return;
+  if (pauseStartedAt) pausedAccum += Date.now() - pauseStartedAt;
+  pauseStartedAt = null;
+  paused = false;
+  runningSince = Date.now();
+  input.disabled = false;
+  document.getElementById("typingArea").classList.remove("is-paused");
+  syncPauseButton();
+  input.focus();
+  setStatus("");
+  updateTimer();
+  if (!finished) timerInterval = setInterval(updateTimer, 250);
+}
+
+function startLesson(index) {
+  currentIndex = index;
+  finished = false;
+  paused = false;
+  testActive = false;
+  elapsedBefore = 0;
+  runningSince = null;
+  pauseStartedAt = null;
+  pausedAccum = 0;
+  clearInterval(timerInterval);
+  timerInterval = null;
+  lastTyped = "";
+  lastPassage = "";
+  lastMistakes = [];
+  document.getElementById("home").style.display = "none";
+  document.getElementById("results").classList.remove("active");
+  const area = document.getElementById("typingArea");
+  area.classList.add("active");
+  area.classList.remove("is-paused");
+  document.getElementById("lessonTitle").textContent = lessons[index].title;
+  input.value = "";
+  input.disabled = false;
+  passageHidden = false;
+  passageBox.style.display = "";
+  document.getElementById("hideBtn").textContent = "Hide passage";
+  document.getElementById("liveWpm").textContent = "0";
+  document.getElementById("liveNet").textContent = "0";
+  document.getElementById("liveNet").style.color = "#1d4ed8";
+  document.getElementById("liveAcc").textContent = "100%";
+  document.getElementById("liveErrors").textContent = "0";
+  document.getElementById("liveProgress").textContent = "0%";
+  setStatus("");
+  renderClock();
+  renderPassage("");
+  syncPauseButton();
+  input.focus();
+}
+
+function finishTest(fromTimer) {
+  if (finished) return;
+  const typed = input.value;
+  if (!typed.length && !fromTimer) {
+    setStatus("Type the passage before finishing.");
+    return;
+  }
+  if (runningSince) {
+    elapsedBefore += Date.now() - runningSince;
+    runningSince = null;
+  }
+  finished = true;
+  testActive = false;
+  paused = false;
+  clearInterval(timerInterval);
+  input.disabled = true;
+  document.getElementById("typingArea").classList.remove("is-paused");
+  document.getElementById("typingArea").classList.remove("active");
+
+  const passage = lessons[currentIndex].text;
+  const stats = analyze(typed, passage);
+  const score = scoreFrom(stats, activeMs());
+  lastTyped = typed;
+  lastPassage = passage;
+  lastMistakes = stats.mistakes;
+
+  document.getElementById("resNet").textContent = String(score.netWpm);
+  document.getElementById("resGross").textContent = String(score.grossWpm);
+  document.getElementById("resAcc").textContent = score.accuracy + "%";
+  document.getElementById("resErrors").textContent = String(stats.errors);
+  document.getElementById("resChars").textContent = String(stats.totalChars);
+  document.getElementById("resTime").textContent = formatClock(Math.floor(activeMs() / 1000));
+  document.getElementById("netItem").classList.toggle("pass", score.qualified);
+  document.getElementById("netItem").classList.toggle("fail", !score.qualified);
+  document.getElementById("errItem").classList.toggle("fail", stats.errors > 0);
+  document.getElementById("resultHeading").textContent = lessons[currentIndex].title + " — result";
+
+  const message = document.getElementById("resultMessage");
+  if (score.qualified) {
+    message.style.color = "#166534";
+    message.textContent = "Qualified. Net speed is " + score.netWpm + " WPM. The qualifying speed is 28 net WPM.";
+  } else {
+    message.style.color = "#b91c1c";
+    message.textContent = "Not qualified. Net speed is " + score.netWpm + " WPM. The qualifying speed is 28 net WPM.";
+  }
+
+  const untouched = Math.max(0, passage.length - typed.length);
+  const pauseText = currentPausedMs() >= 1000
+    ? " Paused time excluded: " + formatClock(Math.floor(currentPausedMs() / 1000)) + "."
+    : "";
+  document.getElementById("leftNote").textContent = untouched
+    ? "You did not reach the last " + untouched + " characters. Those are not counted as mistakes." + pauseText
+    : "You reached the end of the passage." + pauseText;
+
+  renderTypedReview(typed, passage);
+  fillMistakeTable(typed, passage, stats.mistakes);
+  paintCheck(typed, passage, stats.mistakes);
+  document.getElementById("results").classList.add("active");
+
+  const selfTestRun = new URLSearchParams(location.search).has("selftest");
+  if (typed.length && !selfTestRun) {
+    const previous = loadBest()[String(currentIndex)];
+    if (!previous || score.netWpm > previous.net) {
+      saveBest(currentIndex, { net: score.netWpm, acc: score.accuracy, errors: stats.errors });
+    }
+  }
+}
+
+function init() {
+  const grid = document.getElementById("lessonsGrid");
+  const best = loadBest();
+  lessons.forEach(function (lesson, i) {
+    const card = document.createElement("div");
+    card.className = "lesson-card";
+    const title = document.createElement("h3");
+    title.textContent = lesson.title;
+    const meta = document.createElement("div");
+    meta.className = "wc";
+    const words = wordCount(lesson.text);
+    meta.textContent = words + " words · " + lesson.text.length + " characters";
+    card.appendChild(title);
+    card.appendChild(meta);
+    const saved = best[String(i)];
+    if (saved) {
+      const bestEl = document.createElement("div");
+      bestEl.className = "best";
+      bestEl.textContent = "Best " + saved.net + " net WPM";
+      card.appendChild(bestEl);
+    }
+    card.onclick = function () { startLesson(i); };
+    grid.appendChild(card);
+  });
+}
+
+input.addEventListener("input", function () {
+  if (finished || paused) return;
+  if (!testActive && input.value.length > 0) {
+    testActive = true;
+    elapsedBefore = 0;
+    runningSince = Date.now();
+    paused = false;
+    syncPauseButton();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimer, 250);
+  }
+  updateLiveStats(input.value);
+  if (testActive) renderClock();
+});
+
+input.addEventListener("paste", function (event) {
+  event.preventDefault();
+  setStatus("Paste is turned off so the speed is yours.");
+});
+input.addEventListener("drop", function (event) { event.preventDefault(); });
+
+document.getElementById("finishBtn").onclick = function () { finishTest(false); };
+document.getElementById("pauseBtn").onclick = function () {
+  if (paused) resumeTest();
+  else pauseTest();
+};
+document.getElementById("restartBtn").onclick = function () {
+  if (input.value && !confirm("Restart this lesson? This attempt will be cleared.")) return;
+  startLesson(currentIndex);
+};
+document.getElementById("backBtn").onclick = function () {
+  if (input.value && !finished && !confirm("Go back to lessons? This attempt will be cleared.")) return;
+  clearInterval(timerInterval);
+  testActive = false;
+  document.getElementById("typingArea").classList.remove("active");
+  document.getElementById("home").style.display = "block";
+  initRefreshBest();
+};
+document.getElementById("retryBtn").onclick = function () { startLesson(currentIndex); };
+document.getElementById("homeBtn").onclick = function () {
+  document.getElementById("results").classList.remove("active");
+  document.getElementById("home").style.display = "block";
+  initRefreshBest();
+};
+document.getElementById("hideBtn").onclick = function () {
+  passageHidden = !passageHidden;
+  passageBox.style.display = passageHidden ? "none" : "";
+  document.getElementById("hideBtn").textContent = passageHidden ? "Show passage" : "Hide passage";
+};
+document.getElementById("recheckBtn").onclick = function () {
+  const ok = paintCheck(lastTyped, lastPassage, lastMistakes);
+  if (ok) {
+    const again = analyze(lastTyped, lastPassage);
+    document.getElementById("checkNote").textContent =
+      "Checked again just now. Mistakes on screen: " + lastMistakes.length +
+      ". Fresh count from the final text: " + again.errors + ". They match.";
+    document.getElementById("checkNote").classList.add("pass");
+  }
+};
+passageBox.addEventListener("click", function () { if (!input.disabled) input.focus(); });
+
+document.addEventListener("keydown", function (event) {
+  if (event.key !== "Escape") return;
+  if (!document.getElementById("typingArea").classList.contains("active")) return;
+  if (!testActive || finished) return;
+  event.preventDefault();
+  if (paused) resumeTest();
+  else pauseTest();
+});
+
+function initRefreshBest() {
+  document.getElementById("lessonsGrid").textContent = "";
+  init();
+}
+
+function runSelfTest() {
+  const lines = [];
+  let failed = 0;
+  function check(name, cond) {
+    lines.push((cond ? "PASS" : "FAIL") + " - " + name);
+    if (!cond) failed++;
+  }
+  try {
+    const counts = [293, 285, 270, 257, 236, 221, 215, 200, 196, 196];
+    counts.forEach(function (count, i) {
+      check("lesson " + (i + 1) + " has " + count + " words", wordCount(lessons[i].text) === count);
+    });
+    check("old backslash word split is not used", wordCount("one two") === 2);
+
+    const passage = lessons[0].text;
+    check("exact prefix is not punished for unread text", analyze(passage.slice(0, 50), passage).errors === 0);
+    const extra = analyze(passage + "Z", passage);
+    check("one extra character is one mistake", extra.errors === 1 && extra.mistakes[0].expected === null && extra.mistakes[0].typed === "Z");
+
+    const at28 = scoreFrom({ totalChars: 140, correct: 140, errors: 0 }, 60000);
+    check("140 characters in 60s is 28 and qualifies", at28.netWpm === 28 && at28.qualified === true);
+    const at27 = scoreFrom({ totalChars: 135, correct: 135, errors: 0 }, 60000);
+    check("135 characters in 60s is 27 and does not qualify", at27.netWpm === 27 && at27.qualified === false);
+    const penalised = scoreFrom({ totalChars: 140, correct: 135, errors: 5 }, 60000);
+    check("five mistakes deduct one word", penalised.grossWpm === 28 && penalised.netWpm === 27 && penalised.qualified === false);
+    const smallPenalty = scoreFrom({ totalChars: 140, correct: 138, errors: 2 }, 60000);
+    check("two mistakes round to no word deduction", smallPenalty.errorPenalty === 0 && smallPenalty.netWpm === 28);
+
+    elapsedBefore = 12500;
+    runningSince = null;
+    paused = true;
+    check("paused clock stays frozen", activeMs() === 12500);
+
+    const sentenceEnd = passage.indexOf("overstated.") + "overstated.".length;
+    const end = Math.max(sentenceEnd, 250);
+    const typedArr = passage.slice(0, end).split("");
+    const edits = [
+      { word: "importance", repl: "importence" },
+      { word: "modern", repl: "modren" },
+      { word: "cannot", repl: "cann0t" }
+    ];
+    edits.forEach(function (edit) {
+      const at = passage.indexOf(edit.word);
+      if (at < 0 || at + edit.word.length > typedArr.length) throw new Error("Missing " + edit.word);
+      for (let k = 0; k < edit.repl.length; k++) typedArr[at + k] = edit.repl[k];
+    });
+    const typed = typedArr.join("");
+    const stats = analyze(typed, passage);
+    check("sample has exactly 4 character mistakes", stats.errors === 4);
+    const imp = passage.indexOf("importance");
+    const mod = passage.indexOf("modern");
+    const can = passage.indexOf("cannot");
+    function has(index, expected, got) {
+      return stats.mistakes.some(function (item) {
+        return item.index === index && item.expected === expected && item.typed === got;
+      });
+    }
+    check("importance a typed as e", has(imp + 6, "a", "e"));
+    check("modern e typed as r", has(mod + 3, "e", "r"));
+    check("modern r typed as e", has(mod + 4, "r", "e"));
+    check("cannot o typed as 0", has(can + 4, "o", "0"));
+    check("unread tail is not a mistake", stats.errors === 4 && typed.length < passage.length);
+
+    startLesson(0);
+    input.value = typed;
+    elapsedBefore = 60000;
+    runningSince = null;
+    paused = false;
+    pauseStartedAt = null;
+    pausedAccum = 15000;
+    finished = false;
+    testActive = true;
+    finishTest(false);
+
+    const minutes = 1;
+    const expectGross = Math.round((typed.length / 5) / minutes);
+    const expectPenalty = Math.round((4 / 5) / minutes);
+    const expectNet = expectGross - expectPenalty;
+    const expectAcc = Math.round(((typed.length - 4) / typed.length) * 100);
+    check("result net matches the formula", document.getElementById("resNet").textContent === String(expectNet));
+    check("result gross matches the formula", document.getElementById("resGross").textContent === String(expectGross));
+    check("result accuracy matches the formula", document.getElementById("resAcc").textContent === expectAcc + "%");
+    check("result shows 4 mistakes", document.getElementById("resErrors").textContent === "4");
+    check("result active time is 1:00", document.getElementById("resTime").textContent === "1:00");
+    check("sample qualifies at 28", document.getElementById("resultMessage").textContent.indexOf("Qualified") === 0);
+    check("screen check passed", document.getElementById("checkNote").classList.contains("pass"));
+    check("table has 4 rows", document.querySelectorAll("#mistakeBody tr").length === 4);
+    check("row check agrees with the passage", verifyMistakes(typed, passage, stats.mistakes));
+
+    const rows = document.querySelectorAll("#mistakeBody tr");
+    const expectedRows = [
+      [imp + 6, "a", "e", "importance", "importence"],
+      [mod + 3, "e", "r", "modern", "modren"],
+      [mod + 4, "r", "e", "modern", "modren"],
+      [can + 4, "o", "0", "cannot", "cann0t"]
+    ];
+    expectedRows.forEach(function (row, n) {
+      const tr = rows[n];
+      const ok = tr
+        && Number(tr.dataset.index) === row[0]
+        && tr.dataset.exp === row[1]
+        && tr.dataset.typed === row[2]
+        && tr.dataset.expectedWord === row[3]
+        && tr.dataset.typedWord === row[4];
+      check("mistake " + (n + 1) + " expected " + row[1] + " typed " + row[2] + " in " + row[4], ok);
+      if (tr) {
+        const cells = tr.querySelectorAll("td");
+        lines.push(
+          "ROW " + (n + 1) +
+          " char " + cells[1].textContent +
+          " expected " + cells[2].textContent +
+          " typed " + cells[3].textContent +
+          " passage " + cells[4].textContent +
+          " yours " + cells[5].textContent
+        );
+      }
+    });
+
+    document.getElementById("recheckBtn").click();
+    check("check again still passes", document.getElementById("checkNote").textContent.indexOf("They match") !== -1);
+
+    let beforePause = 0;
+    if (!new URLSearchParams(location.search).has("shot")) {
+      startLesson(0);
+      input.value = "A";
+      input.dispatchEvent(new Event("input"));
+      beforePause = activeMs();
+      pauseTest();
+      const frozen = activeMs();
+      check("pause locks the box", input.disabled === true && paused === true);
+      check("pause freezes active time", activeMs() === frozen && runningSince === null);
+      resumeTest();
+      check("resume opens the box", input.disabled === false && paused === false && runningSince !== null);
+      pauseTest();
+      check("second pause stays frozen", runningSince === null);
+      clearInterval(timerInterval);
+    }
+
+    lines.unshift(
+      "SAMPLE typed mistakes on lesson 1, active time 1:00",
+      "characters " + typed.length + "  gross " + expectGross + "  net " + expectNet + "  accuracy " + expectAcc + "%  mistakes 4  qualified yes",
+      "1. importance -> importence  (a typed as e)",
+      "2. modern -> modren  (e typed as r, r typed as e)",
+      "3. cannot -> cann0t  (o typed as 0)",
+      "pause freeze sample before=" + beforePause
+    );
+  } catch (err) {
+    failed++;
+    lines.push("FAIL - exception - " + (err && err.stack ? err.stack : err));
+  }
+  const log = document.getElementById("selftestLog");
+  log.hidden = new URLSearchParams(location.search).has("shot");
+  log.textContent = lines.join("\n");
+  document.title = failed ? "SELFTEST FAIL " + failed : "SELFTEST PASS";
+}
+
+init();
+if (new URLSearchParams(location.search).has("selftest")) runSelfTest();
+</script>
+</body>
+</html>
