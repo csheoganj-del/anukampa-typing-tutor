@@ -185,13 +185,13 @@ footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85re
     <div class="lesson-head">
       <h2 id="lessonTitle">Lesson</h2>
     </div>
-    <p class="note" id="typingNote">Keep the printed paper in front of you and type here. The clock starts on your first key. Esc pauses and resumes. Backspace can correct before you finish. Paste is off.</p>
+    <p class="note" id="typingNote">Keep the printed paper in front of you and type here. Extra spaces are not counted. Only a word that prints with the wrong spelling is a mistake. The clock starts on your first key. Esc pauses and resumes. Paste is off.</p>
     <div class="stats-bar">
       <div class="stat"><div class="label" id="timerLabel">Time left</div><div class="value" id="timer">10:00</div></div>
       <div class="stat"><div class="label">Gross WPM</div><div class="value" id="liveWpm">0</div></div>
       <div class="stat"><div class="label">Net WPM</div><div class="value" id="liveNet">0</div></div>
       <div class="stat"><div class="label">Accuracy</div><div class="value" id="liveAcc">100%</div></div>
-      <div class="stat"><div class="label">Mistakes</div><div class="value" id="liveErrors">0</div></div>
+      <div class="stat"><div class="label">Wrong words</div><div class="value" id="liveErrors">0</div></div>
       <div class="stat"><div class="label">Progress</div><div class="value" id="liveProgress">0%</div></div>
     </div>
     <div class="pause-banner" id="pauseBanner">Paused. The clock is stopped and typing is locked. Press Resume or Esc.</div>
@@ -210,17 +210,18 @@ footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85re
     <div id="resultMessage"></div>
     <div class="formula">
       <b>Gross WPM</b> = (characters typed ÷ 5) ÷ active minutes<br>
-      <b>Net WPM</b> = Gross WPM − (mistakes ÷ 5 ÷ active minutes)<br>
-      <b>Accuracy</b> = (correct characters ÷ characters typed) × 100<br>
-      5 characters = 1 word. 5 mistakes reduce the speed by 1 word.
-      Characters you have not reached are not mistakes. Pause time is not counted.
+      <b>Net WPM</b> = Gross WPM − (wrong words ÷ active minutes)<br>
+      <b>Accuracy</b> = (correct printed words ÷ printed words typed) × 100<br>
+      The result is checked the way a printed page is checked. Extra spaces are ignored.
+      A word is wrong only when the printed spelling does not match. One wrong word reduces the speed by 1 word.
+      Words you have not reached are not mistakes. Pause time is not counted.
       Qualifying speed for this Anukampa Niyukti test: <b>28 net WPM</b>.
     </div>
     <div class="result-grid">
       <div class="result-item" id="netItem"><div class="big" id="resNet">0</div><div class="label">Net WPM</div></div>
       <div class="result-item"><div class="big" id="resGross">0</div><div class="label">Gross WPM</div></div>
       <div class="result-item"><div class="big" id="resAcc">0%</div><div class="label">Accuracy</div></div>
-      <div class="result-item" id="errItem"><div class="big" id="resErrors">0</div><div class="label">Mistakes</div></div>
+      <div class="result-item" id="errItem"><div class="big" id="resErrors">0</div><div class="label">Wrong words</div></div>
       <div class="result-item"><div class="big" id="resTime">0:00</div><div class="label">Active time</div></div>
       <div class="result-item"><div class="big" id="resChars">0</div><div class="label">Characters</div></div>
     </div>
@@ -234,11 +235,9 @@ footer { text-align: center; margin-top: 22px; color: #94a3b8; font-size: 0.85re
         <thead>
           <tr>
             <th>#</th>
-            <th>Character</th>
-            <th>Expected</th>
+            <th>On the printed page</th>
+            <th>Expected word</th>
             <th>You typed</th>
-            <th>Passage</th>
-            <th>Your text</th>
           </tr>
         </thead>
         <tbody id="mistakeBody"></tbody>
@@ -301,46 +300,118 @@ function currentPausedMs() {
   return ms;
 }
 
-function showChar(ch, isExtra) {
-  if (isExtra) return "nothing (extra key)";
-  if (ch === " ") return "space";
-  if (ch === "\n") return "Enter";
-  return '"' + ch + '"';
+function splitWords(text) {
+  const words = [];
+  const pattern = /\S+/g;
+  let match;
+  while ((match = pattern.exec(text))) {
+    words.push({ word: match[0], index: match.index });
+  }
+  return words;
 }
 
-function wordAt(text, index) {
-  if (index < 0 || index >= text.length) return "";
-  if (text[index] === " ") return "(space)";
-  let start = index;
-  while (start > 0 && text[start - 1] !== " ") start--;
-  let end = index;
-  while (end < text.length && text[end] !== " ") end++;
-  return text.slice(start, end);
-}
-
-function snippet(text, index) {
-  if (index >= text.length) return "(end of text)";
-  const start = Math.max(0, index - 16);
-  const end = Math.min(text.length, index + 17);
-  const before = text.slice(start, index);
-  const ch = text[index] === " " ? "␣" : text[index];
-  const after = text.slice(index + 1, end);
-  return (start > 0 ? "…" : "") + before + "[" + ch + "]" + after + (end < text.length ? "…" : "");
-}
-
-function analyze(typed, passage) {
-  const mistakes = [];
-  for (let i = 0; i < typed.length; i++) {
-    const extra = i >= passage.length;
-    const expected = extra ? null : passage[i];
-    if (extra || typed[i] !== expected) {
-      mistakes.push({ index: i, expected: expected, typed: typed[i] });
+function alignWords(typedWords, passageWords) {
+  const ops = [];
+  let i = 0;
+  let j = 0;
+  const window = 8;
+  while (i < typedWords.length && j < passageWords.length) {
+    if (typedWords[i].word === passageWords[j].word) {
+      ops.push({ type: "eq", ti: i, pi: j });
+      i++;
+      j++;
+      continue;
+    }
+    let foundPassage = -1;
+    let foundTyped = -1;
+    for (let k = 1; k <= window && j + k < passageWords.length; k++) {
+      if (typedWords[i].word === passageWords[j + k].word) {
+        foundPassage = k;
+        break;
+      }
+    }
+    for (let k = 1; k <= window && i + k < typedWords.length; k++) {
+      if (typedWords[i + k].word === passageWords[j].word) {
+        foundTyped = k;
+        break;
+      }
+    }
+    if (foundPassage > 0 && (foundTyped < 0 || foundPassage <= foundTyped)) {
+      for (let k = 0; k < foundPassage; k++) ops.push({ type: "del", pi: j + k });
+      j += foundPassage;
+    } else if (foundTyped > 0) {
+      for (let k = 0; k < foundTyped; k++) ops.push({ type: "ins", ti: i + k });
+      i += foundTyped;
+    } else {
+      ops.push({ type: "sub", ti: i, pi: j });
+      i++;
+      j++;
     }
   }
+  while (i < typedWords.length) {
+    ops.push({ type: "ins", ti: i });
+    i++;
+  }
+  while (j < passageWords.length) {
+    ops.push({ type: "del", pi: j });
+    j++;
+  }
+  return ops;
+}
+
+function analyze(typed, passage, ended) {
+  if (ended === undefined) ended = true;
+  let typedWords = splitWords(typed);
+  const passageWords = splitWords(passage);
+  const wordStillOpen = !ended && typed.length > 0 && !/\s$/.test(typed);
+  if (wordStillOpen && typedWords.length) typedWords = typedWords.slice(0, -1);
+  const ops = alignWords(typedWords, passageWords);
+  let lastTypedOp = -1;
+  ops.forEach(function (op, idx) {
+    if (op.type === "eq" || op.type === "ins" || op.type === "sub") lastTypedOp = idx;
+  });
+  const mistakes = [];
+  let notReached = 0;
+  ops.forEach(function (op, idx) {
+    if (op.type === "eq") return;
+    if (op.type === "del" && idx > lastTypedOp) {
+      notReached++;
+      return;
+    }
+    if (op.type === "sub") {
+      mistakes.push({
+        kind: "wrong",
+        expected: passageWords[op.pi].word,
+        typed: typedWords[op.ti].word,
+        index: typedWords[op.ti].index,
+        typedIndex: op.ti
+      });
+    } else if (op.type === "ins") {
+      mistakes.push({
+        kind: "extra",
+        expected: null,
+        typed: typedWords[op.ti].word,
+        index: typedWords[op.ti].index,
+        typedIndex: op.ti
+      });
+    } else if (op.type === "del") {
+      mistakes.push({
+        kind: "missing",
+        expected: passageWords[op.pi].word,
+        typed: "",
+        index: -1,
+        typedIndex: -1
+      });
+    }
+  });
+  const wrongTyped = mistakes.filter(function (item) { return item.typedIndex >= 0; }).length;
   return {
     totalChars: typed.length,
-    correct: typed.length - mistakes.length,
+    typedWords: typedWords.length,
+    correctWords: typedWords.length - wrongTyped,
+    correct: typedWords.length - wrongTyped,
     errors: mistakes.length,
+    notReached: notReached,
     mistakes: mistakes
   };
 }
@@ -348,9 +419,12 @@ function analyze(typed, passage) {
 function scoreFrom(stats, ms) {
   const minutes = Math.max(ms, 1) / 60000;
   const grossWpm = Math.round((stats.totalChars / 5) / minutes);
-  const errorPenalty = Math.round((stats.errors / 5) / minutes);
+  const errorPenalty = Math.round(stats.errors / minutes);
   const netWpm = Math.max(0, grossWpm - errorPenalty);
-  const accuracy = stats.totalChars > 0 ? Math.round((stats.correct / stats.totalChars) * 100) : 0;
+  let accuracy = 0;
+  if (stats.typedWords > 0) accuracy = Math.round((stats.correctWords / stats.typedWords) * 100);
+  else if (!stats.totalChars) accuracy = 0;
+  else if (!stats.errors) accuracy = 100;
   return {
     grossWpm: grossWpm,
     errorPenalty: errorPenalty,
@@ -361,22 +435,21 @@ function scoreFrom(stats, ms) {
 }
 
 function verifyMistakes(typed, passage, mistakes) {
-  const again = analyze(typed, passage);
+  const again = analyze(typed, passage, true);
   if (again.errors !== mistakes.length) return false;
   for (let i = 0; i < mistakes.length; i++) {
     const a = again.mistakes[i];
     const b = mistakes[i];
-    if (a.index !== b.index || a.typed !== b.typed || a.expected !== b.expected) return false;
+    if (a.kind !== b.kind || a.typed !== b.typed || a.expected !== b.expected) return false;
   }
   const rows = document.querySelectorAll("#mistakeBody tr");
   if (rows.length !== mistakes.length) return false;
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const item = mistakes[i];
-    if (Number(row.dataset.index) !== item.index) return false;
-    if (row.dataset.typed !== item.typed) return false;
-    const exp = item.expected === null ? "" : item.expected;
-    if (row.dataset.exp !== exp) return false;
+    if (row.dataset.kind !== item.kind) return false;
+    if ((row.dataset.exp || "") !== (item.expected || "")) return false;
+    if ((row.dataset.typed || "") !== (item.typed || "")) return false;
   }
   return true;
 }
@@ -410,14 +483,23 @@ function syncPauseButton() {
 function renderTypedReview(typed, passage) {
   const box = document.getElementById("typedReview");
   box.textContent = "";
+  const stats = analyze(typed, passage, true);
+  const bad = {};
+  stats.mistakes.forEach(function (item) {
+    if (item.typedIndex >= 0) bad[item.typedIndex] = true;
+  });
+  const words = splitWords(typed);
   const frag = document.createDocumentFragment();
-  for (let i = 0; i < typed.length; i++) {
+  let cursor = 0;
+  words.forEach(function (item, index) {
+    if (item.index > cursor) frag.appendChild(document.createTextNode(typed.slice(cursor, item.index)));
     const span = document.createElement("span");
-    span.textContent = typed[i];
-    const expected = i < passage.length ? passage[i] : null;
-    span.className = expected === typed[i] ? "ok" : "bad";
+    span.textContent = item.word;
+    span.className = bad[index] ? "bad" : "ok";
     frag.appendChild(span);
-  }
+    cursor = item.index + item.word.length;
+  });
+  if (cursor < typed.length) frag.appendChild(document.createTextNode(typed.slice(cursor)));
   box.appendChild(frag);
 }
 
@@ -426,26 +508,17 @@ function fillMistakeTable(typed, passage, mistakes) {
   body.textContent = "";
   mistakes.forEach(function (item, n) {
     const tr = document.createElement("tr");
-    tr.dataset.index = String(item.index);
-    tr.dataset.exp = item.expected === null ? "" : item.expected;
-    tr.dataset.typed = item.typed;
-    const cells = [
-      String(n + 1),
-      String(item.index + 1),
-      showChar(item.expected, item.expected === null),
-      showChar(item.typed, false),
-      item.expected === null ? "(past the end)" : snippet(passage, item.index),
-      snippet(typed, item.index)
-    ];
-    cells.forEach(function (value) {
+    tr.dataset.kind = item.kind;
+    tr.dataset.exp = item.expected || "";
+    tr.dataset.typed = item.typed || "";
+    tr.dataset.expectedWord = item.expected || "";
+    tr.dataset.typedWord = item.typed || "";
+    const kindLabel = item.kind === "wrong" ? "Spelling" : item.kind === "extra" ? "Extra word" : "Missing word";
+    [String(n + 1), kindLabel, item.expected || "—", item.typed || "—"].forEach(function (value) {
       const td = document.createElement("td");
       td.textContent = value;
       tr.appendChild(td);
     });
-    const expectedWord = item.expected === null ? "" : wordAt(passage, item.index);
-    const typedWord = wordAt(typed, item.index);
-    tr.dataset.expectedWord = expectedWord;
-    tr.dataset.typedWord = typedWord;
     body.appendChild(tr);
   });
 }
@@ -456,23 +529,23 @@ function paintCheck(typed, passage, mistakes) {
   note.classList.remove("pass", "fail");
   if (ok && mistakes.length === 0) {
     note.classList.add("pass");
-    note.textContent = "Checked: no mismatches. Every typed character matches the passage. Counted again from the final text: 0 mistakes.";
+    note.textContent = "Checked again on the printed words. Extra spaces are ignored. Wrong words: 0.";
   } else if (ok) {
     note.classList.add("pass");
-    note.textContent = "Checked: all " + mistakes.length + " mistakes match the passage, character by character. Counted again from the final text: " + mistakes.length + ".";
+    note.textContent = "Checked again on the printed words. Extra spaces are ignored. Wrong words: " + mistakes.length + ". A fresh count found the same " + mistakes.length + ".";
   } else {
     note.classList.add("fail");
-    note.textContent = "Check failed. The mistake list does not match a fresh count of the final text. Retry the lesson.";
+    note.textContent = "Check failed. The mistake list does not match a fresh count of the printed words. Retry the lesson.";
   }
   return ok;
 }
 
 function updateLiveStats(typed) {
   const passage = lessons[currentIndex].text;
-  const stats = analyze(typed, passage);
+  const stats = analyze(typed, passage, false);
   const ms = activeMs();
   document.getElementById("liveErrors").textContent = String(stats.errors);
-  document.getElementById("liveAcc").textContent = (typed.length ? Math.round((stats.correct / typed.length) * 100) : 100) + "%";
+  document.getElementById("liveAcc").textContent = (stats.typedWords ? Math.round((stats.correctWords / stats.typedWords) * 100) : 100) + "%";
   document.getElementById("liveProgress").textContent = Math.min(100, Math.round((typed.length / passage.length) * 100)) + "%";
   if (ms < 500) {
     document.getElementById("liveWpm").textContent = "0";
@@ -575,7 +648,7 @@ function finishTest(fromTimer) {
   document.getElementById("typingArea").classList.remove("active");
 
   const passage = lessons[currentIndex].text;
-  const stats = analyze(typed, passage);
+  const stats = analyze(typed, passage, true);
   const score = scoreFrom(stats, activeMs());
   lastTyped = typed;
   lastPassage = passage;
@@ -601,13 +674,12 @@ function finishTest(fromTimer) {
     message.textContent = "Not qualified. Net speed is " + score.netWpm + " WPM. The qualifying speed is 28 net WPM.";
   }
 
-  const untouched = Math.max(0, passage.length - typed.length);
   const pauseText = currentPausedMs() >= 1000
     ? " Paused time excluded: " + formatClock(Math.floor(currentPausedMs() / 1000)) + "."
     : "";
-  document.getElementById("leftNote").textContent = untouched
-    ? "You did not reach the last " + untouched + " characters. Those are not counted as mistakes." + pauseText
-    : "You reached the end of the passage." + pauseText;
+  document.getElementById("leftNote").textContent = stats.notReached
+    ? "You did not reach the last " + stats.notReached + " words. Those are not counted. Extra spaces are not counted." + pauseText
+    : "You reached the end of the passage. Extra spaces are not counted." + pauseText;
 
   renderTypedReview(typed, passage);
   fillMistakeTable(typed, passage, stats.mistakes);
@@ -698,8 +770,8 @@ document.getElementById("recheckBtn").onclick = function () {
   if (ok) {
     const again = analyze(lastTyped, lastPassage);
     document.getElementById("checkNote").textContent =
-      "Checked again just now. Mistakes on screen: " + lastMistakes.length +
-      ". Fresh count from the final text: " + again.errors + ". They match.";
+      "Checked again just now on the printed words. Extra spaces ignored. Wrong words on screen: " + lastMistakes.length +
+      ". Fresh count: " + again.errors + ". They match.";
     document.getElementById("checkNote").classList.add("pass");
   }
 };
@@ -732,18 +804,29 @@ function runSelfTest() {
     check("old backslash word split is not used", wordCount("one two") === 2);
 
     const passage = lessons[0].text;
-    check("exact prefix is not punished for unread text", analyze(passage.slice(0, 50), passage).errors === 0);
+    const prefixEnd = passage.indexOf(" ", 40);
+    check("exact prefix is not punished for unread text", analyze(passage.slice(0, prefixEnd), passage).errors === 0);
+    const spaceEnd = passage.indexOf(" ", 90);
+    const spaced = passage.slice(0, spaceEnd).replace(/ /g, "   ");
+    check("extra spaces are not wrong words", analyze(spaced, passage).errors === 0);
+    const splitWord = passage.slice(0, 120).replace("importance", "import ance");
+    const splitStats = analyze(splitWord, passage);
+    check("a space inside one word does not wrong later words",
+      splitStats.errors >= 1 && splitStats.errors <= 3 &&
+      splitStats.mistakes.every(function (item) {
+        return item.expected !== "education" && item.expected !== "society" && item.expected !== "of";
+      }));
     const extra = analyze(passage + "Z", passage);
-    check("one extra character is one mistake", extra.errors === 1 && extra.mistakes[0].expected === null && extra.mistakes[0].typed === "Z");
+    check("one extra letter on the last word is one wrong word", extra.errors === 1 && extra.mistakes[0].kind === "wrong" && extra.mistakes[0].typed.slice(-1) === "Z");
 
-    const at28 = scoreFrom({ totalChars: 140, correct: 140, errors: 0 }, 60000);
+    const at28 = scoreFrom({ totalChars: 140, typedWords: 28, correctWords: 28, errors: 0 }, 60000);
     check("140 characters in 60s is 28 and qualifies", at28.netWpm === 28 && at28.qualified === true);
-    const at27 = scoreFrom({ totalChars: 135, correct: 135, errors: 0 }, 60000);
+    const at27 = scoreFrom({ totalChars: 135, typedWords: 27, correctWords: 27, errors: 0 }, 60000);
     check("135 characters in 60s is 27 and does not qualify", at27.netWpm === 27 && at27.qualified === false);
-    const penalised = scoreFrom({ totalChars: 140, correct: 135, errors: 5 }, 60000);
-    check("five mistakes deduct one word", penalised.grossWpm === 28 && penalised.netWpm === 27 && penalised.qualified === false);
-    const smallPenalty = scoreFrom({ totalChars: 140, correct: 138, errors: 2 }, 60000);
-    check("two mistakes round to no word deduction", smallPenalty.errorPenalty === 0 && smallPenalty.netWpm === 28);
+    const penalised = scoreFrom({ totalChars: 140, typedWords: 28, correctWords: 27, errors: 1 }, 60000);
+    check("one wrong word deducts one word", penalised.grossWpm === 28 && penalised.netWpm === 27 && penalised.qualified === false);
+    const fiveWords = scoreFrom({ totalChars: 140, typedWords: 28, correctWords: 23, errors: 5 }, 60000);
+    check("five wrong words deduct five", fiveWords.errorPenalty === 5 && fiveWords.netWpm === 23);
 
     elapsedBefore = 12500;
     runningSince = null;
@@ -751,7 +834,7 @@ function runSelfTest() {
     check("paused clock stays frozen", activeMs() === 12500);
 
     const sentenceEnd = passage.indexOf("overstated.") + "overstated.".length;
-    const end = Math.max(sentenceEnd, 250);
+    const end = passage.lastIndexOf(" ", Math.max(sentenceEnd, 250));
     const typedArr = passage.slice(0, end).split("");
     const edits = [
       { word: "importance", repl: "importence" },
@@ -765,20 +848,16 @@ function runSelfTest() {
     });
     const typed = typedArr.join("");
     const stats = analyze(typed, passage);
-    check("sample has exactly 4 character mistakes", stats.errors === 4);
-    const imp = passage.indexOf("importance");
-    const mod = passage.indexOf("modern");
-    const can = passage.indexOf("cannot");
-    function has(index, expected, got) {
+    check("sample has exactly 3 wrong words", stats.errors === 3);
+    function hasWord(expected, got) {
       return stats.mistakes.some(function (item) {
-        return item.index === index && item.expected === expected && item.typed === got;
+        return item.kind === "wrong" && item.expected === expected && item.typed === got;
       });
     }
-    check("importance a typed as e", has(imp + 6, "a", "e"));
-    check("modern e typed as r", has(mod + 3, "e", "r"));
-    check("modern r typed as e", has(mod + 4, "r", "e"));
-    check("cannot o typed as 0", has(can + 4, "o", "0"));
-    check("unread tail is not a mistake", stats.errors === 4 && typed.length < passage.length);
+    check("importance typed as importence", hasWord("importance", "importence"));
+    check("modern typed as modren", hasWord("modern", "modren"));
+    check("cannot typed as cann0t", hasWord("cannot", "cann0t"));
+    check("unread tail is not a mistake", stats.notReached > 0 && stats.errors === 3 && typed.length < passage.length);
 
     startLesson(0);
     input.value = typed;
@@ -793,44 +872,41 @@ function runSelfTest() {
 
     const minutes = 1;
     const expectGross = Math.round((typed.length / 5) / minutes);
-    const expectPenalty = Math.round((4 / 5) / minutes);
+    const expectPenalty = Math.round(stats.errors / minutes);
     const expectNet = expectGross - expectPenalty;
-    const expectAcc = Math.round(((typed.length - 4) / typed.length) * 100);
+    const expectAcc = Math.round((stats.correctWords / stats.typedWords) * 100);
     check("result net matches the formula", document.getElementById("resNet").textContent === String(expectNet));
     check("result gross matches the formula", document.getElementById("resGross").textContent === String(expectGross));
     check("result accuracy matches the formula", document.getElementById("resAcc").textContent === expectAcc + "%");
-    check("result shows 4 mistakes", document.getElementById("resErrors").textContent === "4");
+    check("result shows 3 wrong words", document.getElementById("resErrors").textContent === "3");
     check("result active time is 1:00", document.getElementById("resTime").textContent === "1:00");
     check("sample qualifies at 28", document.getElementById("resultMessage").textContent.indexOf("Qualified") === 0);
     check("screen check passed", document.getElementById("checkNote").classList.contains("pass"));
-    check("table has 4 rows", document.querySelectorAll("#mistakeBody tr").length === 4);
+    check("table has 3 rows", document.querySelectorAll("#mistakeBody tr").length === 3);
     check("row check agrees with the passage", verifyMistakes(typed, passage, stats.mistakes));
 
     const rows = document.querySelectorAll("#mistakeBody tr");
     const expectedRows = [
-      [imp + 6, "a", "e", "importance", "importence"],
-      [mod + 3, "e", "r", "modern", "modren"],
-      [mod + 4, "r", "e", "modern", "modren"],
-      [can + 4, "o", "0", "cannot", "cann0t"]
+      ["wrong", "importance", "importence"],
+      ["wrong", "modern", "modren"],
+      ["wrong", "cannot", "cann0t"]
     ];
     expectedRows.forEach(function (row, n) {
       const tr = rows[n];
       const ok = tr
-        && Number(tr.dataset.index) === row[0]
+        && tr.dataset.kind === row[0]
         && tr.dataset.exp === row[1]
         && tr.dataset.typed === row[2]
-        && tr.dataset.expectedWord === row[3]
-        && tr.dataset.typedWord === row[4];
-      check("mistake " + (n + 1) + " expected " + row[1] + " typed " + row[2] + " in " + row[4], ok);
+        && tr.dataset.expectedWord === row[1]
+        && tr.dataset.typedWord === row[2];
+      check("mistake " + (n + 1) + " expected " + row[1] + " typed " + row[2], ok);
       if (tr) {
         const cells = tr.querySelectorAll("td");
         lines.push(
           "ROW " + (n + 1) +
-          " char " + cells[1].textContent +
+          " " + cells[1].textContent +
           " expected " + cells[2].textContent +
-          " typed " + cells[3].textContent +
-          " passage " + cells[4].textContent +
-          " yours " + cells[5].textContent
+          " typed " + cells[3].textContent
         );
       }
     });
@@ -857,10 +933,11 @@ function runSelfTest() {
 
     lines.unshift(
       "SAMPLE typed mistakes on lesson 1, active time 1:00",
-      "characters " + typed.length + "  gross " + expectGross + "  net " + expectNet + "  accuracy " + expectAcc + "%  mistakes 4  qualified yes",
-      "1. importance -> importence  (a typed as e)",
-      "2. modern -> modren  (e typed as r, r typed as e)",
-      "3. cannot -> cann0t  (o typed as 0)",
+      "characters " + typed.length + "  gross " + expectGross + "  net " + expectNet + "  accuracy " + expectAcc + "%  wrong words 3  qualified yes",
+      "1. importance -> importence",
+      "2. modern -> modren",
+      "3. cannot -> cann0t",
+      "extra spaces ignored",
       "pause freeze sample before=" + beforePause
     );
   } catch (err) {
